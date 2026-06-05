@@ -28,7 +28,23 @@ jobs:
           CUSTOM_CONFIG: ${{ vars.CUSTOM_CONFIG }}
         run: |
           export DEBUG=true
-          printf "%b\n" "$CUSTOM_CONFIG" > config/custom.yaml
+          if [ -n "$CUSTOM_CONFIG" ]; then
+            CUSTOM_CONFIG_CONTENT="$CUSTOM_CONFIG" python - <<'PY' > config/custom.yaml
+import os
+import re
+
+content = os.environ["CUSTOM_CONFIG_CONTENT"]
+pattern = re.compile(r"\$\{oc\.env:([^,}]+)\}")
+
+def replace_if_invalid_env_name(match):
+    env_name = match.group(1).strip()
+    if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", env_name):
+        return match.group(0)
+    return env_name
+
+print(pattern.sub(replace_if_invalid_env_name, content), end="")
+PY
+          fi
           echo "Use custom config: "
           cat config/custom.yaml
           uv run src/zotero_arxiv_daily/main.py
