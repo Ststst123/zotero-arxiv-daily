@@ -88,3 +88,21 @@ def test_run_with_hard_timeout_returns_none_on_failure(monkeypatch):
     )
     assert result is None
     assert "boom" in warnings[0]
+
+
+def test_arxiv_retriever_skips_batch_after_retryable_http_errors(config, mock_feedparser, monkeypatch):
+    monkeypatch.setattr(arxiv_retriever, "sleep", lambda _: None)
+
+    class FailingClient:
+        def __init__(self, **kw):
+            pass
+
+        def results(self, search):
+            raise arxiv_retriever.arxiv.HTTPError("https://export.arxiv.org/api/query", 0, 429)
+
+    monkeypatch.setattr(arxiv_retriever.arxiv, "Client", FailingClient)
+
+    retriever = ArxivRetriever(config)
+    raw_papers = retriever._retrieve_raw_papers()
+
+    assert raw_papers == []
